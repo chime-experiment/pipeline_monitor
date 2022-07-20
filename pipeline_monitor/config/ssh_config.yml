@@ -1,0 +1,9 @@
+# Configuration for ssh pipeline monitoring
+ssh:
+  username: lgray
+  hostname: cedar5.cedar.computecanada.ca
+  private: True
+  encoding: 'utf-8'
+
+frequency: 5 # minutes
+root: /project/rpp-chime/chime/chime_processed/
