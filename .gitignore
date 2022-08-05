@@ -4,6 +4,3 @@
 # Environments
 **/.venv*
 **/env*
-
-# Specific files
-requirements.txt
