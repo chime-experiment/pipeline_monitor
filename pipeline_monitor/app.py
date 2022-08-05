@@ -1,5 +1,6 @@
 import yaml
 import atexit
+import tzlocal
 from datetime import datetime
 from pathlib import Path
 from functools import partial
@@ -8,22 +9,8 @@ from flask import Flask, g
 from prometheus_client import make_wsgi_app
 from apscheduler.schedulers.background import BackgroundScheduler
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
-import tzlocal
 
 from pipeline_monitor import commands
-
-# SSH config file
-_CONFIG_FILE = "./pipeline_monitor/config/ssh_config.yml"
-# Prometheus metrics scrape path. Must match metrics_path
-# for job set in prometheus config file.
-_PROMETHEUS_METRICS_TARGET = "/metrics"
-
-# Flask app to provide minimal endpoint for prometheus
-app = Flask(__name__)
-# Add prometheus wsgi middleware to route requests
-app.wsgi_app = DispatcherMiddleware(
-    app.wsgi_app, {_PROMETHEUS_METRICS_TARGET: make_wsgi_app()}
-)
 
 
 def get_config() -> dict:
@@ -49,20 +36,40 @@ def _get_yaml_config() -> dict:
         return yaml.safe_load(fh)
 
 
-# Start background task to periodically fetch metrics.
-# Task will run for the first time immediately.
-# In order for this to work, uwsgi server must be
-# run with threads enabled.
-scheduler = BackgroundScheduler(daemon=True, timezone=str(tzlocal.get_localzone()))
-with app.app_context():
-    # Job has to be created with app context in order to
-    # access flask 'g' variable where the config is stored
-    scheduler.add_job(
-        partial(commands.fetch_chp_metrics, config=get_config()),
-        "interval",
-        minutes=get_config()["frequency"],
-        next_run_time=datetime.now(),
+def run():
+    # SSH config file
+    global _CONFIG_FILE
+    _CONFIG_FILE = "./pipeline_monitor/config/ssh_config.yml"
+    # Prometheus metrics scrape path. Must match metrics_path
+    # for job set in prometheus config file.
+    _PROMETHEUS_METRICS_TARGET = "/metrics"
+
+    # Flask app to provide minimal endpoint for prometheus
+    global app
+    app = Flask(__name__)
+    # Add prometheus wsgi middleware to route requests
+    app.wsgi_app = DispatcherMiddleware(
+        app.wsgi_app, {_PROMETHEUS_METRICS_TARGET: make_wsgi_app()}
     )
-scheduler.start()
-# Shut down the scheduler when flask app closes
-atexit.register(lambda: scheduler.shutdown())
+    # Start background task to periodically fetch metrics.
+    # Task will run for the first time immediately.
+    # In order for this to work, uwsgi server must be
+    # run with threads enabled.
+    scheduler = BackgroundScheduler(daemon=True, timezone=str(tzlocal.get_localzone()))
+    with app.app_context():
+        # Job has to be created with app context in order to
+        # access flask 'g' variable where the config is stored
+        scheduler.add_job(
+            partial(commands.fetch_chp_metrics, config=get_config()),
+            "interval",
+            minutes=get_config()["frequency"],
+            next_run_time=datetime.now(),
+        )
+    scheduler.start()
+    # Shut down the scheduler when flask app closes
+    atexit.register(lambda: scheduler.shutdown())
+
+
+# This is how it is called from uwsgi cli
+if __name__ == "uwsgi_file_pipeline_monitor_app":
+    run()
