@@ -1,4 +1,4 @@
-import ast
+from typing import Dict
 from prometheus_client import Gauge, REGISTRY
 from pipeline_monitor.ssh import SSHAutoConnect
 
@@ -17,22 +17,22 @@ def _get_gauge(name: str, desc: str = "", **kwargs) -> "Gauge":
     gauge = REGISTRY._names_to_collectors.get(name, None)
 
     if gauge is None:
-        gauge = Gauge(name=name, documentation=desc, labelnames=["id"])
+        labelnames = kwargs.get("labelnames", ["type", "revision"])
+        gauge = Gauge(name=name, documentation=desc, labelnames=labelnames)
 
     return gauge
 
 
 def _parse_to_dict(
-    text: str, spliton: str = ":", delim: str = "\n", eval: bool = False
-) -> dict:
+    text: str, spliton: str = ":", delim: str = "\n"
+) -> Dict[str, float]:
     """Parse a string of key-value pairs into a dictionary."""
     # Split input string based on delim
     line_to_kv_pair = lambda s: map(str.strip, s.split(spliton))
     # Map strings into key:value pairs based on spliton
     d = dict(map(line_to_kv_pair, text.strip().split(delim)))
     # Evaluate all values as literals
-    if eval:
-        d = {k: ast.literal_eval(v) for k, v in d.items()}
+    d = {k.lower(): float(v) for k, v in d.items()}
 
     return d
 
@@ -94,15 +94,19 @@ def fetch_chp_metrics(config: dict) -> None:
     # Get ssh client with connection established
     client = SSHAutoConnect.from_yaml_dict(config)
     # Get all available types and revisions
-    typerevs = [
-        [t, _get_revs(client, config["root"], t)]
-        for t in _get_types(client, config["root"])
-    ]
+    blocktypes = config.get("blocktypes", set())
+    blockrevs = config.get("blockrevs", set())
+    blockmetrics = config.get("blockmetrics", set())
+    typerevs = dict()
+    for t in _get_types(client, config["root"]):
+        if t not in blocktypes:
+            revs = set(_get_revs(client, config["root"], t)) - blockrevs
+            typerevs[t] = revs
 
     def _fmt(text: str) -> str:
         return "chp_" + text.strip().lower().replace(" ", "_")
 
-    for t, revs in typerevs:
+    for t, revs in typerevs.items():
         for r in revs:
             # Execute chp metrics command and automatically
             # read resulting stdout
@@ -110,7 +114,12 @@ def fetch_chp_metrics(config: dict) -> None:
                 f"chp --root {config['root']} item metrics {t}:{r}"
             )
             # Convert the stdout string return to a dict
-            entry_metric = _parse_to_dict(metric_str, eval=True)
+            entry_metric = _parse_to_dict(metric_str)
             # Update prometheus gauges with chp metric values.
             for k, v in entry_metric.items():
-                _get_gauge(_fmt(k)).labels(id=f"{t}:{r}").set(v)
+                if k == "fairshare":
+                    _get_gauge(_fmt(k), labelnames=[]).set(v)
+                    continue
+                if k in blockmetrics:
+                    continue
+                _get_gauge(_fmt(k)).labels(type=str(t), revision=str(r)).set(v)
