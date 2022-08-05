@@ -7,3 +7,6 @@ ssh:
 
 frequency: 5 # minutes
 root: /project/rpp-chime/chime/chime_processed/
+# blocktypes: []
+# blockrevs: []
+# blockmetrics: []

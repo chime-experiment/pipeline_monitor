@@ -8,6 +8,7 @@ from flask import Flask, g
 from prometheus_client import make_wsgi_app
 from apscheduler.schedulers.background import BackgroundScheduler
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
+import tzlocal
 
 from pipeline_monitor import commands
 
@@ -52,7 +53,7 @@ def _get_yaml_config() -> dict:
 # Task will run for the first time immediately.
 # In order for this to work, uwsgi server must be
 # run with threads enabled.
-scheduler = BackgroundScheduler(daemon=True)
+scheduler = BackgroundScheduler(daemon=True, timezone=str(tzlocal.get_localzone()))
 with app.app_context():
     # Job has to be created with app context in order to
     # access flask 'g' variable where the config is stored
