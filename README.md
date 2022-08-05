@@ -2,10 +2,6 @@ Flask web app and Prometheus config to monitor CHIME pipeline progress.
 
 # Install
 Installation should be done in a virtual environment.
-```console
-(venv) foo@bar:~$ pip install -r <path-to-file>/requirements.txt
-```
-Config must be set up by making a copy of config/sample_config.yml.
 
 
 # Running
