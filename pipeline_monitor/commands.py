@@ -94,9 +94,9 @@ def fetch_chp_metrics(config: dict) -> None:
     # Get ssh client with connection established
     client = SSHAutoConnect.from_yaml_dict(config)
     # Get all available types and revisions
-    blocktypes = config.get("blocktypes", set())
-    blockrevs = config.get("blockrevs", set())
-    blockmetrics = config.get("blockmetrics", set())
+    blocktypes = set(config.get("blocktypes", set()))
+    blockrevs = set(config.get("blockrevs", set()))
+    blockmetrics = set(config.get("blockmetrics", set()))
     typerevs = dict()
     for t in _get_types(client, config["root"]):
         if t not in blocktypes:
