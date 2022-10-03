@@ -1,1 +1,1 @@
-uwsgi uwsgi.ini
+uwsgi uwsgi_file.ini
