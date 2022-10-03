@@ -4,6 +4,7 @@ ssh:
   hostname: cedar5.cedar.computecanada.ca
   private: True
   encoding: 'utf-8'
+  venv: "~/projects/rpp-chime/lgray/chime_pipeline_dev/venv/bin/activate"
 
 # Configuration for job tracking
 frequency: 5 # minutes

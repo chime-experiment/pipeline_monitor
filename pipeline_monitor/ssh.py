@@ -18,6 +18,7 @@ class SSHAutoConnect(paramiko.SSHClient):
     private : bool
         whether or not to load ssh keys
     """
+    _venv = ""
 
     def __init__(self, login: dict, encoding: str, private: bool = False):
         super().__init__()
@@ -50,7 +51,7 @@ class SSHAutoConnect(paramiko.SSHClient):
         with (Path(yaml_path)).open() as fh:
             yaml_file = safe_load(fh)
 
-        return cls.from_yaml_str(yaml_file)
+        return cls.from_yaml_dict(yaml_file)
 
     @classmethod
     def from_yaml_dict(cls, yaml_file: dict) -> "SSHAutoConnect":
@@ -96,13 +97,16 @@ class SSHAutoConnect(paramiko.SSHClient):
         """
         login_keys = ["hostname", "username", "password"]
         login = {k: config.get(k, "") for k in login_keys}
-
+        venv = config.get("venv", "")
         # Default to system encoding if nothing provided
         self = cls(
             login=login,
             encoding=config.get("encoding", sys.stdout.encoding),
             private=config.get("private", False),
         )
+
+        if venv:
+            self._venv = venv
 
         return self
 
@@ -122,6 +126,8 @@ class SSHAutoConnect(paramiko.SSHClient):
         error : str
             stderr return from command
         """
+        if self._venv:
+            command = f"source {self._venv}; "+command
         (_, stdout, stderr) = self.exec_command(command)
         result = stdout.read().decode(self._encoding)
         error = stderr.read().decode(self._encoding)
