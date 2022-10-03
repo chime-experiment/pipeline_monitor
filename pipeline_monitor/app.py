@@ -1,6 +1,6 @@
 import yaml
 import atexit
-import tzlocal
+from tzlocal import get_localzone
 from datetime import datetime
 from pathlib import Path
 from functools import partial
@@ -36,26 +36,14 @@ def _get_yaml_config() -> dict:
         return yaml.safe_load(fh)
 
 
-def run():
-    # SSH config file
-    global _CONFIG_FILE
-    _CONFIG_FILE = "./pipeline_monitor/config/ssh_config.yml"
-    # Prometheus metrics scrape path. Must match metrics_path
-    # for job set in prometheus config file.
-    _PROMETHEUS_METRICS_TARGET = "/metrics"
-
-    # Flask app to provide minimal endpoint for prometheus
-    global app
-    app = Flask(__name__)
-    # Add prometheus wsgi middleware to route requests
-    app.wsgi_app = DispatcherMiddleware(
-        app.wsgi_app, {_PROMETHEUS_METRICS_TARGET: make_wsgi_app()}
-    )
+def schedule_monitor():
+    global scheduler
     # Start background task to periodically fetch metrics.
     # Task will run for the first time immediately.
     # In order for this to work, uwsgi server must be
     # run with threads enabled.
-    scheduler = BackgroundScheduler(daemon=True, timezone=str(tzlocal.get_localzone()))
+    scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
+
     with app.app_context():
         # Job has to be created with app context in order to
         # access flask 'g' variable where the config is stored
@@ -70,6 +58,23 @@ def run():
     atexit.register(lambda: scheduler.shutdown())
 
 
-# This is how it is called from uwsgi cli
-if __name__ == "uwsgi_file_pipeline_monitor_app":
-    run()
+def serve():
+    global _CONFIG_FILE
+    global app
+    # SSH config file
+    _CONFIG_FILE = "./pipeline_monitor/config/ssh_config.yml"
+    # Prometheus metrics scrape path. Must match metrics_path
+    # for job set in prometheus config file.
+    _PROMETHEUS_METRICS_TARGET = "/metrics"
+    # Flask app to provide minimal endpoint for prometheus
+    app = Flask(__name__)
+    # Add prometheus wsgi middleware to route requests
+    app.wsgi_app = DispatcherMiddleware(
+        app.wsgi_app, {_PROMETHEUS_METRICS_TARGET: make_wsgi_app()}
+    )
+
+
+# Blocks server from being started when importing from python
+if __name__ in {"uwsgi_file_pipeline_monitor_app", "pipeline_monitor.app"}:
+    serve()
+    schedule_monitor()
