@@ -5,8 +5,10 @@ ssh:
   private: True
   encoding: 'utf-8'
 
+# Configuration for job tracking
 frequency: 5 # minutes
 root: /project/rpp-chime/chime/chime_processed/
+user: chime
 blocktypes: [test_daily]
 blockrevs: [rev_00, rev_01, rev_02, rev_03, rev_04]
-# blockmetrics: []
+blockmetrics: []

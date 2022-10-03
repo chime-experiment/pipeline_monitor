@@ -111,7 +111,7 @@ def fetch_chp_metrics(config: dict) -> None:
             # Execute chp metrics command and automatically
             # read resulting stdout
             metric_str, _ = client.exec_get_result(
-                f"chp --root {config['root']} item metrics {t}:{r}"
+                f"chp --root {config['root']} item metrics {t}:{r} -u {config['user']}"
             )
             # Convert the stdout string return to a dict
             entry_metric = _parse_to_dict(metric_str)
