@@ -98,6 +98,7 @@ def fetch_chp_metrics(config: dict) -> None:
     blockrevs = set(config.get("blockrevs", set()))
     blockmetrics = set(config.get("blockmetrics", set()))
     typerevs = dict()
+
     for t in _get_types(client, config["root"]):
         if t not in blocktypes:
             revs = set(_get_revs(client, config["root"], t)) - blockrevs
