@@ -20,3 +20,9 @@ dependencies = [
 
 [project.urls]
 "Homepage" = "https://github.com/chime-experiment/pipeline_monitor"
+
+[tools.setuptools.packages.find]
+where = ["pipeline-monitor/config"]
+
+[tools.setuptools.package-data]
+pipeline_monitor = ["ssh_config.yaml"]
