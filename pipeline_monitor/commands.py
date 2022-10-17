@@ -92,7 +92,7 @@ def fetch_chp_metrics(config: dict) -> None:
     all 'chp_' Gauges
     """
     # Get ssh client with connection established
-    client = SSHAutoConnect.from_yaml_dict(config)
+    client = SSHAutoConnect.from_config(config["ssh"])
     # Get all available types and revisions
     blocktypes = set(config.get("blocktypes", set()))
     blockrevs = set(config.get("blockrevs", set()))
