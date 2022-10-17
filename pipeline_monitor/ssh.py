@@ -23,7 +23,6 @@ class SSHAutoConnect(paramiko.SSHClient):
         super().__init__()
         self._encoding = encoding
         # Loads all system keys. This should be improved.
-
         if private:
             self.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.load_system_host_keys()
@@ -49,7 +48,7 @@ class SSHAutoConnect(paramiko.SSHClient):
         SSHAutoConnect : class
             class instance initialized by config file
         """
-        login_keys = ["hostname", "username", "password"]
+        login_keys = ["hostname", "username", "password", "key_filename"]
         login = {k: config.get(k, "") for k in login_keys}
         venv = config.get("venv", "")
         # Default to system encoding if nothing provided

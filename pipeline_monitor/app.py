@@ -17,7 +17,7 @@ _PROMETHEUS_METRICS_TARGET = "/metrics"
 # Global config
 _config = {
     "ssh": {
-        "username": "lgray",
+        "username": "chime",
         "hostname": "cedar5.cedar.computecanada.ca",
         "key_filename": "/root/.ssh/id_cedar_shared",
         "private": True,
