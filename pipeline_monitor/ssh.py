@@ -23,6 +23,7 @@ class SSHAutoConnect(paramiko.SSHClient):
         super().__init__()
         self._encoding = encoding
         # Loads all system keys. This should be improved.
+
         if private:
             self.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.load_system_host_keys()
@@ -31,6 +32,7 @@ class SSHAutoConnect(paramiko.SSHClient):
             hostname=login.get("hostname", ""),
             username=login.get("username", ""),
             password=login.get("password", ""),
+            key_filename=login.get("key_filename", "")
         )
 
     @classmethod

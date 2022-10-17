@@ -19,6 +19,7 @@ _config = {
     "ssh": {
         "username": "lgray",
         "hostname": "cedar5.cedar.computecanada.ca",
+        "key_filename": "/root/.ssh/id_cedar_shared",
         "private": True,
         "encoding": "utf-8",
         "venv": "~/projects/rpp-chime/lgray/chime_pipeline_dev/venv/bin/activate",
