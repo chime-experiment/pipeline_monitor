@@ -103,7 +103,11 @@ def setup(config: dict) -> dict:
 
     for t in _get_types(client, config["root"]):
         if t not in ignoretypes:
-            revs = set(_get_revs(client, config["root"], t)) - ignorerevs
+            revs = set(_get_revs(client, config["root"], t))
+            if config["newest_only"]:
+                revs = [sorted(revs)[-1]]
+            else:
+                revs = revs - ignorerevs
             to_monitor.extend([(t, r) for r in revs])
 
     return to_monitor
@@ -132,8 +136,6 @@ def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
         return "chp_" + text.strip().lower().replace(" ", "_")
 
     for t, r in to_monitor:
-        # Execute chp metrics command and automatically
-        # read resulting stdout
         metric_str, _ = client.exec_get_result(
             f"chp --root {config['root']} item metrics {t}:{r} -u {config['user']}"
         )

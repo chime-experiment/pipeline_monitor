@@ -17,7 +17,7 @@ class SSHAutoConnect(paramiko.SSHClient):
         whether or not to load ssh keys
     """
 
-    _venv = ""
+    _command_prefix = ""
 
     def __init__(self, login: dict, encoding: str, private: bool = False):
         super().__init__()
@@ -50,7 +50,6 @@ class SSHAutoConnect(paramiko.SSHClient):
         """
         login_keys = ["hostname", "username", "password", "key_filename"]
         login = {k: config.get(k, "") for k in login_keys}
-        venv = config.get("venv", "")
         # Default to system encoding if nothing provided
         self = cls(
             login=login,
@@ -58,8 +57,13 @@ class SSHAutoConnect(paramiko.SSHClient):
             private=config.get("private", False),
         )
 
-        if venv:
-            self._venv = venv
+        # Format prefix required for executing commands
+        prefix = f"module use {config.get('modpath', '')}; "
+        for m in config.get('modules', []):
+            prefix += f"module load {m}; "
+        prefix += f"source {config.get('venv', '')}; "
+
+        self._command_prefix = prefix
 
         return self
 
@@ -79,8 +83,8 @@ class SSHAutoConnect(paramiko.SSHClient):
         error : str
             stderr return from command
         """
-        if self._venv:
-            command = f"source {self._venv}; " + command
+        command = self._command_prefix + command
+
         (_, stdout, stderr) = self.exec_command(command)
         result = stdout.read().decode(self._encoding)
         error = stderr.read().decode(self._encoding)

@@ -22,14 +22,17 @@ _config = {
         "key_filename": "/root/.ssh/id_cedar_shared",
         "private": True,
         "encoding": "utf-8",
-        "venv": "~/projects/rpp-chime/lgray/chime_pipeline_dev/venv/bin/activate",
+        "venv": "/project/rpp-chime/lgray/chime_pipeline_dev/venv/bin/activate",
+        "modpath": "~/chime_env/modules/modulefiles/",
+        "modules": ["chime/python/2022.06"]
     },
-    "frequency": 5,  # minutes
+    "frequency": 15,  # minutes
     "root": "/project/rpp-chime/chime/chime_processed/",
     "user": "chime",
+    "newest_only": True,
     "ignoretypes": ["test_daily"],
-    "ignorerevs": ["rev_00", "rev_01", "rev_02", "rev_03", "rev_04"],
-    "ignoremetrics": [],
+    #"ignorerevs": set(),
+    #"ignoremetrics": set(),
 }
 
 
