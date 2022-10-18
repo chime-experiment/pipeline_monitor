@@ -86,15 +86,39 @@ def _get_revs(client: "SSHAutoConnect", root: str, type: str) -> list:
     return available_revs.strip().split("\n")
 
 
-def fetch_chp_metrics(config: dict) -> None:
+def setup(config: dict) -> dict:
+    """Configure the types and revision to monitor.
+    
+    Parameters
+    ----------
+    config : dict
+        ssh configuration
+    """
+    # Get ssh client with connection established
+    client = SSHAutoConnect.from_config(config["ssh"])
+    # Get all available types and revisions
+    ignoretypes = set(config.get("ignoretypes", set()))
+    ignorerevs = set(config.get("ignorerevs", set()))
+    to_monitor = []
+
+    for t in _get_types(client, config["root"]):
+        if t not in ignoretypes:
+            revs = set(_get_revs(client, config["root"], t)) - ignorerevs
+            to_monitor.extend([(t, r) for r in revs])
+
+    return to_monitor
+
+
+def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
     """Open an ssh connection to the host defined
     in config and fetch metrics for each entry.
 
     Parameters
     ----------
     config : dict
-        ssh configuration in dict format. Usually
-        loaded from yaml file.
+        ssh configuration
+    to_monitor : list
+        list of (type, revision) pairs to watch
 
     Changes
     -------
@@ -102,34 +126,24 @@ def fetch_chp_metrics(config: dict) -> None:
     """
     # Get ssh client with connection established
     client = SSHAutoConnect.from_config(config["ssh"])
-    # Get all available types and revisions
-    ignoretypes = set(config.get("ignoretypes", set()))
-    ignorerevs = set(config.get("ignorerevs", set()))
     ignoremetrics = set(config.get("ignoremetrics", set()))
-    typerevs = dict()
-
-    for t in _get_types(client, config["root"]):
-        if t not in ignoretypes:
-            revs = set(_get_revs(client, config["root"], t)) - ignorerevs
-            typerevs[t] = revs
 
     def _fmt(text: str) -> str:
         return "chp_" + text.strip().lower().replace(" ", "_")
 
-    for t, revs in typerevs.items():
-        for r in revs:
-            # Execute chp metrics command and automatically
-            # read resulting stdout
-            metric_str, _ = client.exec_get_result(
-                f"chp --root {config['root']} item metrics {t}:{r} -u {config['user']}"
-            )
-            # Convert the stdout string return to a dict
-            entry_metric = _parse(metric_str)
-            # Update prometheus gauges with chp metric values.
-            for k, v in entry_metric.items():
-                if k == "fairshare":
-                    _get_gauge(_fmt(k), labelnames=[]).set(v)
-                    continue
-                if k in ignoremetrics:
-                    continue
-                _get_gauge(_fmt(k)).labels(type=str(t), revision=str(r)).set(v)
+    for t, r in to_monitor:
+        # Execute chp metrics command and automatically
+        # read resulting stdout
+        metric_str, _ = client.exec_get_result(
+            f"chp --root {config['root']} item metrics {t}:{r} -u {config['user']}"
+        )
+        # Convert the stdout string return to a dict
+        entry_metric = _parse(metric_str)
+        # Update prometheus gauges with chp metric values.
+        for k, v in entry_metric.items():
+            if k == "fairshare":
+                _get_gauge(_fmt(k), labelnames=[]).set(v)
+                continue
+            if k in ignoremetrics:
+                continue
+            _get_gauge(_fmt(k)).labels(type=str(t), revision=str(r)).set(v)

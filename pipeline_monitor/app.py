@@ -41,10 +41,11 @@ def schedule_monitor() -> None:
     # In order for this to work, uwsgi server must be
     # run with threads enabled.
     scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
+    # Get the list of type : revision to monitor
+    monitor_list = commands.setup(_config)
 
-    # with app.app_context():
     scheduler.add_job(
-        partial(commands.fetch_chp_metrics, config=_config),
+        partial(commands.fetch_chp_metrics, config=_config, to_monitor=monitor_list),
         "interval",
         minutes=_config["frequency"],
         next_run_time=datetime.now(),
