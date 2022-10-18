@@ -9,6 +9,18 @@ Installation should be done in a virtual environment.
 (venv) foo@bar:~$ ./run.sh
 ```
 
-If Prometheus is running as a system service, make sure to add the job found in 'config/prometheus.yml' to the prometheus config file. Otherwise, run
-```console
-(venv) foo@bar:~$ sudo /<path-to-prometheus> --config.file=pipeline_monitor/config/prometheus.yml
+
+# Prometheus
+The following snippet added to a prometheus config allows prometheus to scrape the pipeline metrics.
+```yaml
+- job_name: 'pipeline_monitor'
+
+scrape_interval: 15s
+scrape_timeout: 15s
+
+metrics_path: "/metrics"
+
+static_configs:
+    - targets: ['localhost:5000']
+```
+

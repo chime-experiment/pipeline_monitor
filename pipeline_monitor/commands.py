@@ -46,7 +46,6 @@ def _parse(text: str) -> dict:
     return {i[0]: f(i[1]) for i in match}
 
 
-
 def _get_types(client: "SSHAutoConnect", root: str) -> list:
     """Get all processing types.
 
