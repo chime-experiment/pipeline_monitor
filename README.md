@@ -1,14 +1,9 @@
 Flask web app and Prometheus config to monitor CHIME pipeline progress. 
 
-# Install
-Installation should be done in a virtual environment.
-
-
 # Running
 ```console
-(venv) foo@bar:~$ ./run.sh
+(venv) foo@bar:~$ uwsgi uwsgi_file.ini
 ```
-
 
 # Prometheus
 The following snippet added to a prometheus config allows prometheus to scrape the pipeline metrics.
@@ -23,4 +18,3 @@ metrics_path: "/metrics"
 static_configs:
     - targets: ['localhost:5000']
 ```
-
