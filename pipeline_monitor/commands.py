@@ -1,4 +1,5 @@
-from typing import Dict
+import re
+
 from prometheus_client import Gauge, REGISTRY
 from pipeline_monitor.ssh import SSHAutoConnect
 
@@ -23,18 +24,27 @@ def _get_gauge(name: str, desc: str = "", **kwargs) -> "Gauge":
     return gauge
 
 
-def _parse_to_dict(
-    text: str, spliton: str = ":", delim: str = "\n"
-) -> Dict[str, float]:
-    """Parse a string of key-value pairs into a dictionary."""
-    # Split input string based on delim
-    line_to_kv_pair = lambda s: map(str.strip, s.split(spliton))
-    # Map strings into key:value pairs based on spliton
-    d = dict(map(line_to_kv_pair, text.strip().split(delim)))
-    # Evaluate all values as literals
-    d = {k.lower(): float(v) for k, v in d.items()}
+def _parse(text: str) -> dict:
+    """Parse a string including key-value pairs into a dictionary.
+    
+    Paramaters
+    ----------
+    text : str
+        string including the desired key: value pairs
+    
+    Returns
+    -------
+    dict:
+        key: value pairs with values cast to numeric types
+    """
+    # Get regex match for key: value pairs
+    pattern = re.compile(r'(\w+):\s*[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)')
+    match = pattern.findall(text)
+    # Cast values to either floats or ints
+    f = lambda x: float(x) if re.findall(r'[.eE]', x) else int(x)
 
-    return d
+    return {i[0]: f(i[1]) for i in match}
+
 
 
 def _get_types(client: "SSHAutoConnect", root: str) -> list:
@@ -94,14 +104,14 @@ def fetch_chp_metrics(config: dict) -> None:
     # Get ssh client with connection established
     client = SSHAutoConnect.from_config(config["ssh"])
     # Get all available types and revisions
-    blocktypes = set(config.get("blocktypes", set()))
-    blockrevs = set(config.get("blockrevs", set()))
-    blockmetrics = set(config.get("blockmetrics", set()))
+    ignoretypes = set(config.get("ignoretypes", set()))
+    ignorerevs = set(config.get("ignorerevs", set()))
+    ignoremetrics = set(config.get("ignoremetrics", set()))
     typerevs = dict()
 
     for t in _get_types(client, config["root"]):
-        if t not in blocktypes:
-            revs = set(_get_revs(client, config["root"], t)) - blockrevs
+        if t not in ignoretypes:
+            revs = set(_get_revs(client, config["root"], t)) - ignorerevs
             typerevs[t] = revs
 
     def _fmt(text: str) -> str:
@@ -115,12 +125,12 @@ def fetch_chp_metrics(config: dict) -> None:
                 f"chp --root {config['root']} item metrics {t}:{r} -u {config['user']}"
             )
             # Convert the stdout string return to a dict
-            entry_metric = _parse_to_dict(metric_str)
+            entry_metric = _parse(metric_str)
             # Update prometheus gauges with chp metric values.
             for k, v in entry_metric.items():
                 if k == "fairshare":
                     _get_gauge(_fmt(k), labelnames=[]).set(v)
                     continue
-                if k in blockmetrics:
+                if k in ignoremetrics:
                     continue
                 _get_gauge(_fmt(k)).labels(type=str(t), revision=str(r)).set(v)

@@ -27,9 +27,9 @@ _config = {
     "frequency": 5,  # minutes
     "root": "/project/rpp-chime/chime/chime_processed/",
     "user": "chime",
-    "blocktypes": ["test_daily"],
-    "blockrevs": ["rev_00", "rev_01", "rev_02", "rev_03", "rev_04"],
-    "blockmetrics": [],
+    "ignoretypes": ["test_daily"],
+    "ignorerevs": ["rev_00", "rev_01", "rev_02", "rev_03", "rev_04"],
+    "ignoremetrics": [],
 }
 
 
