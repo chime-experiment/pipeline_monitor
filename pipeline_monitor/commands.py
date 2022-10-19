@@ -23,7 +23,7 @@ def _get_gauge(name: str, desc: str = "", **kwargs) -> "Gauge":
     if gauge is None:
         labelnames = kwargs.get("labelnames", ["type", "revision"])
         gauge = Gauge(name=name, documentation=desc, labelnames=labelnames)
-        logger.info(f"Created new gauge {name}.")
+        logger.info(f"Created new gauge '{name}'.")
 
     return gauge
 
@@ -101,12 +101,12 @@ def setup(config: dict) -> dict:
     # Get ssh client with connection established
     client = SSHAutoConnect.from_config(config["ssh"])
     # Get all available types and revisions
-    ignoretypes = set(config.get("ignoretypes", set()))
-    ignorerevs = set(config.get("ignorerevs", set()))
+    ignoretypes = set(config.get("ignoretypes", []))
+    ignorerevs = set(config.get("ignorerevs", []))
     to_monitor = []
 
-    logger.info(f"Ignoring types: {ignoretypes}.")
-    logger.info(f"Ignoring revisions: {ignorerevs}.")
+    logger.info(f"Ignoring types: {list(ignoretypes)}.")
+    logger.info(f"Ignoring revisions: {list(ignorerevs)}.")
 
     for t in _get_types(client, config["root"]):
         if t not in ignoretypes:
@@ -141,8 +141,8 @@ def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
     """
     # Get ssh client with connection established
     client = SSHAutoConnect.from_config(config["ssh"])
-    ignoremetrics = set(config.get("ignoremetrics", set()))
-    logger.info(f"Ignoring metrics: {ignoremetrics}.")
+    ignoremetrics = set(config.get("ignoremetrics", []))
+    logger.info(f"Ignoring metrics: {list(ignoremetrics)}.")
 
     def _fmt(text: str) -> str:
         return "chp_" + text.strip().lower().replace(" ", "_")
@@ -160,9 +160,11 @@ def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
             )
         # Update prometheus gauges with chp metric values.
         for k, v in entry_metric.items():
-            if k == "fairshare":
-                _get_gauge(_fmt(k), labelnames=[]).set(v)
-                continue
             if k in ignoremetrics:
                 continue
+            if k == "fairshare":
+                _get_gauge(_fmt(k), labelnames=[]).set(v)
+                logger.debug(f"Updated gauge {_fmt(k)}")
+                continue
             _get_gauge(_fmt(k)).labels(type=str(t), revision=str(r)).set(v)
+            logger.debug(f"Updated gauge {_fmt(k)}, {str(t)}:{str(r)}")

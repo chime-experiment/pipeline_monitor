@@ -1,5 +1,8 @@
 import atexit
 import logging
+import argparse
+import yaml
+
 from tzlocal import get_localzone
 from datetime import datetime
 from functools import partial
@@ -14,31 +17,29 @@ from pipeline_monitor import commands
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# TODO: better config
-# Prometheus metrics scrape path. Must match metrics_path
-# for job set in prometheus config file.
-_PROMETHEUS_METRICS_TARGET = "/metrics"
-
-# Global config
+# Defaults
 _config = {
-    "ssh": {
-        "username": "chime",
-        "hostname": "cedar5.cedar.computecanada.ca",
-        "key_filename": "/root/.ssh/id_cedar_shared",
-        "private": True,
-        "encoding": "utf-8",
-        "venv": "/project/rpp-chime/lgray/chime_pipeline_dev/venv/bin/activate",
-        "modpath": "~/chime_env/modules/modulefiles/",
-        "modules": ["chime/python/2022.06"],
-    },
-    "frequency": 15,  # minutes
-    "root": "/project/rpp-chime/chime/chime_processed/",
-    "user": "chime",
+    "frequency": 60,
     "newest_only": True,
-    "ignoretypes": ["test_daily"],
-    # "ignorerevs": set(),
-    # "ignoremetrics": set(),
+    "ignoretypes": [],
+    "ignorerevs": [],
+    "ignoremetrics": [],
+    "target": "/metrics"
 }
+
+
+
+def set_global_config() -> dict:
+    global _config
+
+    parser = argparse.ArgumentParser(description="Get config path")
+    parser.add_argument('--appconfig', type=str)
+
+    with open(parser.parse_args().appconfig, 'r') as stream:
+        config_file = yaml.safe_load(stream)
+
+    _config.update(config_file['app'])
+    _config['ssh'] = config_file['ssh']
 
 
 def schedule_monitor() -> None:
@@ -67,16 +68,18 @@ def schedule_monitor() -> None:
 
 def serve() -> None:
     global app
+    global _config
     # Flask app to provide minimal endpoint for prometheus
     app = Flask(__name__)
     # Add prometheus wsgi middleware to route requests
     app.wsgi_app = DispatcherMiddleware(
-        app.wsgi_app, {_PROMETHEUS_METRICS_TARGET: make_wsgi_app()}
+        app.wsgi_app, {_config['target']: make_wsgi_app()}
     )
-    logger.info(f"Started app {app}. Metrics at {_PROMETHEUS_METRICS_TARGET}")
+    logger.info(f"Started app {app}. Metrics at {_config['target']}")
 
 
 # Blocks server from being started when importing from python
 if __name__ in {"uwsgi_file_pipeline_monitor_app", "pipeline_monitor.app"}:
+    set_global_config()
     serve()
     schedule_monitor()
