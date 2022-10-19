@@ -1,6 +1,9 @@
 import paramiko
 import sys
+import logging
 from typing import Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class SSHAutoConnect(paramiko.SSHClient):
@@ -31,7 +34,7 @@ class SSHAutoConnect(paramiko.SSHClient):
             hostname=login.get("hostname", ""),
             username=login.get("username", ""),
             password=login.get("password", ""),
-            key_filename=login.get("key_filename", "")
+            key_filename=login.get("key_filename", ""),
         )
 
     @classmethod
@@ -59,7 +62,7 @@ class SSHAutoConnect(paramiko.SSHClient):
 
         # Format prefix required for executing commands
         prefix = f"module use {config.get('modpath', '')}; "
-        for m in config.get('modules', []):
+        for m in config.get("modules", []):
             prefix += f"module load {m}; "
         prefix += f"source {config.get('venv', '')}; "
 

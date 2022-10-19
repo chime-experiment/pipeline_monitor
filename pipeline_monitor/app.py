@@ -1,4 +1,5 @@
 import atexit
+import logging
 from tzlocal import get_localzone
 from datetime import datetime
 from functools import partial
@@ -10,6 +11,10 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
 from pipeline_monitor import commands
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# TODO: better config
 # Prometheus metrics scrape path. Must match metrics_path
 # for job set in prometheus config file.
 _PROMETHEUS_METRICS_TARGET = "/metrics"
@@ -24,29 +29,31 @@ _config = {
         "encoding": "utf-8",
         "venv": "/project/rpp-chime/lgray/chime_pipeline_dev/venv/bin/activate",
         "modpath": "~/chime_env/modules/modulefiles/",
-        "modules": ["chime/python/2022.06"]
+        "modules": ["chime/python/2022.06"],
     },
     "frequency": 15,  # minutes
     "root": "/project/rpp-chime/chime/chime_processed/",
     "user": "chime",
     "newest_only": True,
     "ignoretypes": ["test_daily"],
-    #"ignorerevs": set(),
-    #"ignoremetrics": set(),
+    # "ignorerevs": set(),
+    # "ignoremetrics": set(),
 }
 
 
 def schedule_monitor() -> None:
     global scheduler
     global _config
+    # Get the list of type : revision to monitor
+    monitor_list = commands.setup(_config)
+    if not monitor_list:
+        logging.info("Didn't find anything to monitor.")
+        return
     # Start background task to periodically fetch metrics.
     # Task will run for the first time immediately.
     # In order for this to work, uwsgi server must be
     # run with threads enabled.
     scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
-    # Get the list of type : revision to monitor
-    monitor_list = commands.setup(_config)
-
     scheduler.add_job(
         partial(commands.fetch_chp_metrics, config=_config, to_monitor=monitor_list),
         "interval",
@@ -66,6 +73,7 @@ def serve() -> None:
     app.wsgi_app = DispatcherMiddleware(
         app.wsgi_app, {_PROMETHEUS_METRICS_TARGET: make_wsgi_app()}
     )
+    logger.info(f"Started app {app}. Metrics at {_PROMETHEUS_METRICS_TARGET}")
 
 
 # Blocks server from being started when importing from python

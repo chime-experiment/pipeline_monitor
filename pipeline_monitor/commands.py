@@ -1,7 +1,10 @@
 import re
+import logging
 
 from prometheus_client import Gauge, REGISTRY
 from pipeline_monitor.ssh import SSHAutoConnect
+
+logger = logging.getLogger(__name__)
 
 
 def _get_gauge(name: str, desc: str = "", **kwargs) -> "Gauge":
@@ -20,28 +23,29 @@ def _get_gauge(name: str, desc: str = "", **kwargs) -> "Gauge":
     if gauge is None:
         labelnames = kwargs.get("labelnames", ["type", "revision"])
         gauge = Gauge(name=name, documentation=desc, labelnames=labelnames)
+        logger.info(f"Created new gauge {name}.")
 
     return gauge
 
 
 def _parse(text: str) -> dict:
     """Parse a string including key-value pairs into a dictionary.
-    
+
     Paramaters
     ----------
     text : str
         string including the desired key: value pairs
-    
+
     Returns
     -------
     dict:
         key: value pairs with values cast to numeric types
     """
     # Get regex match for key: value pairs
-    pattern = re.compile(r'(\w+):\s*[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)')
+    pattern = re.compile(r"(\w+):\s*[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)")
     match = pattern.findall(text)
     # Cast values to either floats or ints
-    f = lambda x: float(x) if re.findall(r'[.eE]', x) else int(x)
+    f = lambda x: float(x) if re.findall(r"[.eE]", x) else int(x)
 
     return {i[0]: f(i[1]) for i in match}
 
@@ -88,7 +92,7 @@ def _get_revs(client: "SSHAutoConnect", root: str, type: str) -> list:
 
 def setup(config: dict) -> dict:
     """Configure the types and revision to monitor.
-    
+
     Parameters
     ----------
     config : dict
@@ -101,13 +105,20 @@ def setup(config: dict) -> dict:
     ignorerevs = set(config.get("ignorerevs", set()))
     to_monitor = []
 
+    logger.info(f"Ignoring types: {ignoretypes}.")
+    logger.info(f"Ignoring revisions: {ignorerevs}.")
+
     for t in _get_types(client, config["root"]):
         if t not in ignoretypes:
             revs = set(_get_revs(client, config["root"], t))
+            if not revs:
+                logger.info(f"Did not find revisions for type {t}")
+                continue
             if config["newest_only"]:
                 revs = [sorted(revs)[-1]]
             else:
                 revs = revs - ignorerevs
+            logger.info(f"Adding revisions {revs} for type {t}.")
             to_monitor.extend([(t, r) for r in revs])
 
     return to_monitor
@@ -131,16 +142,22 @@ def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
     # Get ssh client with connection established
     client = SSHAutoConnect.from_config(config["ssh"])
     ignoremetrics = set(config.get("ignoremetrics", set()))
+    logger.info(f"Ignoring metrics: {ignoremetrics}.")
 
     def _fmt(text: str) -> str:
         return "chp_" + text.strip().lower().replace(" ", "_")
 
     for t, r in to_monitor:
-        metric_str, _ = client.exec_get_result(
-            f"chp --root {config['root']} item metrics {t}:{r} -u {config['user']}"
-        )
+        cmd = f"chp --root {config['root']} item metrics {t}:{r} -u {config['user']}"
+        metric_str, _ = client.exec_get_result(cmd)
         # Convert the stdout string return to a dict
         entry_metric = _parse(metric_str)
+        if not entry_metric:
+            logger.warn(
+                f"No metrics collected for {t}:{r}.\n"
+                f"Remote command was:\n{cmd}\n"
+                f"Remote response was:\n{metric_str}"
+            )
         # Update prometheus gauges with chp metric values.
         for k, v in entry_metric.items():
             if k == "fairshare":
