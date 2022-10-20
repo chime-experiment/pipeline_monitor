@@ -24,22 +24,22 @@ _config = {
     "ignoretypes": [],
     "ignorerevs": [],
     "ignoremetrics": [],
-    "target": "/metrics"
+    "target": "/metrics",
+    "always_refresh": False,
 }
-
 
 
 def set_global_config() -> dict:
     global _config
 
     parser = argparse.ArgumentParser(description="Get config path")
-    parser.add_argument('--appconfig', type=str)
+    parser.add_argument("--appconfig", type=str)
 
-    with open(parser.parse_args().appconfig, 'r') as stream:
+    with open(parser.parse_args().appconfig, "r") as stream:
         config_file = yaml.safe_load(stream)
 
-    _config.update(config_file['app'])
-    _config['ssh'] = config_file['ssh']
+    _config.update(config_file["app"])
+    _config["ssh"] = config_file["ssh"]
 
 
 def schedule_monitor() -> None:
@@ -73,7 +73,7 @@ def serve() -> None:
     app = Flask(__name__)
     # Add prometheus wsgi middleware to route requests
     app.wsgi_app = DispatcherMiddleware(
-        app.wsgi_app, {_config['target']: make_wsgi_app()}
+        app.wsgi_app, {_config["target"]: make_wsgi_app()}
     )
     logger.info(f"Started app {app}. Metrics at {_config['target']}")
 
