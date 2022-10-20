@@ -1,31 +1,17 @@
 import re
 import logging
 
-from prometheus_client import Gauge, REGISTRY
+from prometheus_client import Gauge
 from pipeline_monitor.ssh import SSHAutoConnect
 
 logger = logging.getLogger(__name__)
 
 
-def _get_gauge(name: str, desc: str = "", **kwargs) -> "Gauge":
-    """Get a prometheus gauge by name, or create a new one
-    if no gauge is found.
-
-    Parameters
-    ----------
-    name : str
-        gauge name
-    desc : str
-        description of gauge
-    """
-    gauge = REGISTRY._names_to_collectors.get(name, None)
-
-    if gauge is None:
-        labelnames = kwargs.get("labelnames", ["type", "revision"])
-        gauge = Gauge(name=name, documentation=desc, labelnames=labelnames)
-        logger.info(f"Created new gauge '{name}'.")
-
-    return gauge
+GAUGE = Gauge(
+    name="daily_pipeline_metrics",
+    documentation="Displays various metrics from the daily pipeline running on Cedar.",
+    labelnames=["type", "revision", "metric"],
+)
 
 
 def _parse(text: str) -> dict:
@@ -137,8 +123,13 @@ def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
 
     Changes
     -------
-    all 'chp_' Gauges
+    global GAUGE
     """
+    global GAUGE
+    # Refresh available types and revisions
+    if config.get("always_refresh", False):
+        to_monitor = setup(config)
+
     # Get ssh client with connection established
     client = SSHAutoConnect.from_config(config["ssh"])
     ignoremetrics = set(config.get("ignoremetrics", []))
@@ -162,9 +153,4 @@ def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
         for k, v in entry_metric.items():
             if k in ignoremetrics:
                 continue
-            if k == "fairshare":
-                _get_gauge(_fmt(k), labelnames=[]).set(v)
-                logger.debug(f"Updated gauge {_fmt(k)}")
-                continue
-            _get_gauge(_fmt(k)).labels(type=str(t), revision=str(r)).set(v)
-            logger.debug(f"Updated gauge {_fmt(k)}, {str(t)}:{str(r)}")
+            GAUGE.labels(type=str(t), revision=str(r), metric=_fmt(k)).set(v)
