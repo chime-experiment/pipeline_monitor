@@ -12,7 +12,7 @@ from prometheus_client import make_wsgi_app
 from apscheduler.schedulers.background import BackgroundScheduler
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
-from pipeline_monitor import commands
+from pipeline_monitor import metrics
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +46,7 @@ def schedule_monitor() -> None:
     global scheduler
     global _config
     # Get the list of type : revision to monitor
-    monitor_list = commands.setup(_config)
+    monitor_list = metrics.setup(_config)
     if not monitor_list:
         logging.info("Didn't find anything to monitor.")
         return
@@ -56,7 +56,7 @@ def schedule_monitor() -> None:
     # run with threads enabled.
     scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
     scheduler.add_job(
-        partial(commands.fetch_chp_metrics, config=_config, to_monitor=monitor_list),
+        partial(metrics.fetch_chp_metrics, config=_config, to_monitor=monitor_list),
         "interval",
         minutes=_config["frequency"],
         next_run_time=datetime.now(),
