@@ -26,7 +26,7 @@ FAIRSHARE_GAUGE = Gauge(
 )
 
 
-def _parse(text: str) -> dict:
+def _extract_values_from_message(text: str) -> dict:
     """Parse a string including key-value pairs into a dictionary.
 
     Paramaters
@@ -112,7 +112,7 @@ def setup(config: dict) -> dict:
         if t not in ignoretypes:
             revs = set(_get_revs(client, t, config.get("root", "")))
             if not revs:
-                logger.info(f"Did not find revisions for type {t}")
+                logger.info(f"Did not any find revisions for type '{t}'")
                 continue
             # Only track the most recent revision
             if config["newest_only"]:
@@ -120,13 +120,13 @@ def setup(config: dict) -> dict:
             # Track all revisions not explicitly ignored
             else:
                 revs = revs - ignorerevs
-            logger.info(f"Adding revisions {revs} for type {t}.")
+            logger.info(f"Adding revisions {revs} for type '{t}'.")
             to_monitor.extend([(t, r) for r in revs])
 
     return to_monitor
 
 
-def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
+def get_status(config: dict, to_monitor: list = []) -> None:
     """Open an ssh connection to the host defined
     in config and fetch metrics for each entry.
 
@@ -160,7 +160,7 @@ def fetch_chp_metrics(config: dict, to_monitor: list = []) -> None:
         metric_str, _ = client.exec_get_result(cmd)
 
         # Convert the stdout string return to a dict
-        entry_metric = _parse(metric_str)
+        entry_metric = _extract_values_from_message(metric_str)
         if not entry_metric:
             logger.warn(
                 f"No metrics collected for {t}:{r}.\n"
