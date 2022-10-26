@@ -56,7 +56,7 @@ def schedule_monitor() -> None:
     # run with threads enabled.
     scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
     scheduler.add_job(
-        partial(metrics.fetch_chp_metrics, config=_config, to_monitor=monitor_list),
+        partial(metrics.get_status, config=_config, to_monitor=monitor_list),
         "interval",
         minutes=_config["frequency"],
         next_run_time=datetime.now(),
