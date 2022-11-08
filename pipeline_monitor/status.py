@@ -2,7 +2,7 @@ import re
 import logging
 
 from prometheus_client import Gauge
-from pipeline_monitor.ssh import SSHAutoConnect
+from pipeline_monitor.client import CommandClient
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def _extract_values_from_message(text: str) -> dict:
     return {i[0]: f(i[1]) for i in match}
 
 
-def _get_types(client: "SSHAutoConnect", root: str = "") -> list:
+def _get_types(client: "CommandClient", root: str = "") -> list:
     """Get all processing types.
 
     Parameters
@@ -68,7 +68,7 @@ def _get_types(client: "SSHAutoConnect", root: str = "") -> list:
     return available_types.strip().split("\n")
 
 
-def _get_revs(client: "SSHAutoConnect", type: str, root: str = "") -> list:
+def _get_revs(client: "CommandClient", type: str, root: str = "") -> list:
     """Get all available revisions for a given type.
 
     Parameters
@@ -99,7 +99,7 @@ def setup(config: dict) -> dict:
         ssh configuration
     """
     # Get ssh client with connection established
-    client = SSHAutoConnect.from_config(config["ssh"])
+    client = CommandClient.from_config(config)  # ["ssh"])
     # Get all available types and revisions
     ignoretypes = set(config.get("ignoretypes", []))
     ignorerevs = set(config.get("ignorerevs", []))
@@ -149,7 +149,7 @@ def get_status(config: dict, to_monitor: list = []) -> None:
         to_monitor = setup(config)
 
     # Get ssh client with connection established
-    client = SSHAutoConnect.from_config(config["ssh"])
+    client = CommandClient.from_config(config)  # ["ssh"])
     ignoremetrics = set(config.get("ignoremetrics", []))
     logger.info(f"Ignoring metrics: {list(ignoremetrics)}.")
 

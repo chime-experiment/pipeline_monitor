@@ -12,7 +12,7 @@ from prometheus_client import make_wsgi_app
 from apscheduler.schedulers.background import BackgroundScheduler
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
-from pipeline_monitor import metrics
+from pipeline_monitor import status
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -39,14 +39,19 @@ def set_global_config() -> dict:
         config_file = yaml.safe_load(stream)
 
     _config.update(config_file["app"])
-    _config["ssh"] = config_file["ssh"]
+    _config.update(config_file["ssh"])
+    _config.update(config_file["local"])
+    _config.update(config_file["call"])
+    # _config["ssh"] = config_file["ssh"]
+    # _config["local"] = config_file["local"]
+    # _config["call"] = config_file["call"]
 
 
 def schedule_monitor() -> None:
     global scheduler
     global _config
     # Get the list of type : revision to monitor
-    monitor_list = metrics.setup(_config)
+    monitor_list = status.setup(_config)
     if not monitor_list:
         logging.info("Didn't find anything to monitor.")
         return
@@ -56,7 +61,7 @@ def schedule_monitor() -> None:
     # run with threads enabled.
     scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
     scheduler.add_job(
-        partial(metrics.get_status, config=_config, to_monitor=monitor_list),
+        partial(status.get_status, config=_config, to_monitor=monitor_list),
         "interval",
         minutes=_config["frequency"],
         next_run_time=datetime.now(),
