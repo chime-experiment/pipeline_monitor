@@ -65,7 +65,10 @@ def _get_types(client: "CommandClient", root: str = "") -> list:
     """
     cmd = f"chp --root {root} " if root else "chp "
     available_types, _ = client.exec_get_result(cmd + "type list")
-    return available_types.strip().split("\n")
+    # Finds lines with a single word
+    pattern = re.compile(r"^(\w+)$")
+
+    return [x for x in available_types.strip().split("\n") if pattern.match(x)]
 
 
 def _get_revs(client: "CommandClient", type: str, root: str = "") -> list:
@@ -87,7 +90,10 @@ def _get_revs(client: "CommandClient", type: str, root: str = "") -> list:
     """
     cmd = f"chp --root {root} " if root else "chp "
     available_revs, _ = client.exec_get_result(cmd + f"rev list {type}")
-    return available_revs.strip().split("\n")
+    # Find lines with 'rev_xx' for integers xx
+    pattern = re.compile(r"^rev_[0-9]{2}$")
+
+    return [x for x in available_revs.strip().split("\n") if pattern.match(x)]
 
 
 def setup(config: dict) -> dict:
