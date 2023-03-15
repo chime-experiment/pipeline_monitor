@@ -1,5 +1,6 @@
 import re
 import logging
+from collections import defaultdict
 
 from prometheus_client import Gauge
 from pipeline_monitor.client import CommandClient
@@ -10,13 +11,13 @@ logger = logging.getLogger(__name__)
 TAG_STATUS_GAUGE = Gauge(
     name="chp_item_count",
     documentation="Available, not submitted, complete, and failed chp pipeline jobs.",
-    labelnames=["type", "revision", "state"],
+    labelnames=["type", "revision", "state", "most_recent_revision"],
 )
 
 RUN_STATUS_GAUGE = Gauge(
     name="chp_item_processing",
     documentation="Chp pipeline jobs currently in the slurm queue.",
-    labelnames=["type", "revision", "state"],
+    labelnames=["type", "revision", "state", "most_recent_revision"],
 )
 
 FAIRSHARE_GAUGE = Gauge(
@@ -159,6 +160,11 @@ def get_status(config: dict, to_monitor: list = []) -> None:
     ignoremetrics = set(config.get("ignoremetrics", []))
     logger.info(f"Ignoring metrics: {list(ignoremetrics)}.")
 
+    # Get the most recent revision for each type
+    max_revs = defaultdict(list)
+    _ = [max_revs[i[0]].append(i[1]) for i in to_monitor]
+    max_revs = {k: max(max_revs[k]) for k in max_revs.keys()}
+
     for t, r in to_monitor:
         root = config.get("root", "")
         cmd = f"chp --root {root} " if root else "chp "
@@ -173,6 +179,9 @@ def get_status(config: dict, to_monitor: list = []) -> None:
                 f"Command sent was:\n{cmd}\n"
                 f"Remote response was:\n{metric_str}"
             )
+
+        # Is this the most recent revision for this type?
+        most_recent_revision = int(r == max_revs[t])
         # Update prometheus gauges with chp metric values.
         for k, v in entry_metric.items():
             k = k.strip().lower().replace(" ", "_")
@@ -183,6 +192,16 @@ def get_status(config: dict, to_monitor: list = []) -> None:
             if k == "fairshare":
                 FAIRSHARE_GAUGE.set(v)
             elif k in {"pending", "running"}:
-                RUN_STATUS_GAUGE.labels(type=str(t), revision=str(r), state=k).set(v)
+                RUN_STATUS_GAUGE.labels(
+                    type=str(t),
+                    revision=str(r),
+                    state=k,
+                    most_recent_revision=most_recent_revision,
+                ).set(v)
             else:
-                TAG_STATUS_GAUGE.labels(type=str(t), revision=str(r), state=k).set(v)
+                TAG_STATUS_GAUGE.labels(
+                    type=str(t),
+                    revision=str(r),
+                    state=k,
+                    most_recent_revision=most_recent_revision,
+                ).set(v)
