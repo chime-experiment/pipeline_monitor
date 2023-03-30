@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import re
 import logging
 
 from prometheus_client import Gauge
-from pipeline_monitor.client import CommandClient
 
 logger = logging.getLogger(__name__)
 
@@ -48,91 +49,21 @@ def _extract_values_from_message(text: str) -> dict:
     return {i[0]: f(i[1]) for i in match}
 
 
-def _get_types(client: "CommandClient", root: str = "") -> list:
-    """Get all processing types.
+def _extract_types_and_revs(text: str) -> list[tuple]:
+    blocks = []
 
-    Parameters
-    ----------
-    client : SSHAutoConnect
-        ssh client
-    root : str
-        chp root diirectory
+    for x in text.split("->"):
+        if not x:
+            continue
 
-    Returns
-    -------
-    types : list[str]
-        list of available types
-    """
-    cmd = f"chp --root {root} " if root else "chp "
-    available_types, _ = client.exec_get_result(cmd + "type list")
-    # Finds lines with a single word
-    pattern = re.compile(r"^(\w+)$")
+        x = x.strip().split("\n", 1)
 
-    return [x for x in available_types.strip().split("\n") if pattern.match(x)]
+        blocks.append((*x[0].split(":"), x[-1]))
+
+    return blocks
 
 
-def _get_revs(client: "CommandClient", type: str, root: str = "") -> list:
-    """Get all available revisions for a given type.
-
-    Parameters
-    ----------
-    client : SSHAutoConnect
-        ssh client
-    root : str
-        chp root diirectory
-    type : str
-        processing type to find revisions for
-
-    Returns
-    -------
-    types : list[str]
-        list of available revisions for TYPE
-    """
-    cmd = f"chp --root {root} " if root else "chp "
-    available_revs, _ = client.exec_get_result(cmd + f"rev list {type}")
-    # Find lines with 'rev_xx' for integers xx
-    pattern = re.compile(r"^rev_[0-9]{2}$")
-
-    return [x for x in available_revs.strip().split("\n") if pattern.match(x)]
-
-
-def setup(config: dict) -> dict:
-    """Configure the types and revision to monitor.
-
-    Parameters
-    ----------
-    config : dict
-        ssh configuration
-    """
-    # Get ssh client with connection established
-    client = CommandClient.from_config(config)  # ["ssh"])
-    # Get all available types and revisions
-    ignoretypes = set(config.get("ignoretypes", []))
-    ignorerevs = set(config.get("ignorerevs", []))
-    to_monitor = []
-
-    logger.info(f"Ignoring types: {list(ignoretypes)}.")
-    logger.info(f"Ignoring revisions: {list(ignorerevs)}.")
-
-    for t in _get_types(client, config.get("root", "")):
-        if t not in ignoretypes:
-            revs = set(_get_revs(client, t, config.get("root", "")))
-            if not revs:
-                logger.info(f"Did not any find revisions for type '{t}'")
-                continue
-            # Only track the most recent revision
-            if config["newest_only"]:
-                revs = [sorted(revs)[-1]]
-            # Track all revisions not explicitly ignored
-            else:
-                revs = revs - ignorerevs
-            logger.info(f"Adding revisions {revs} for type '{t}'.")
-            to_monitor.extend([(t, r) for r in revs])
-
-    return to_monitor
-
-
-def get_status(config: dict, to_monitor: list = []) -> None:
+def update(stdout: str, stderr: str) -> None:
     """Open an ssh connection to the host defined
     in config and fetch metrics for each entry.
 
@@ -150,48 +81,24 @@ def get_status(config: dict, to_monitor: list = []) -> None:
     global FAIRSHARE_GAUGE
     global TAG_STATUS_GAUGE
     global RUN_STATUS_GAUGE
-    # Refresh available types and revisions
-    if config.get("always_refresh", False):
-        to_monitor = setup(config)
 
-    # Get ssh client with connection established
-    client = CommandClient.from_config(config)  # ["ssh"])
-    ignoremetrics = set(config.get("ignoremetrics", []))
-    logger.info(f"Ignoring metrics: {list(ignoremetrics)}.")
-
-    for t, r in to_monitor:
-        root = config.get("root", "")
-        cmd = f"chp --root {root} " if root else "chp "
-        cmd += f"item status {t}:{r} -u {config.get('user', 'chime')}"
-        metric_str, _ = client.exec_get_result(cmd)
-
+    # Split between revisions and types
+    for t, r, output in _extract_types_and_revs(stdout):
         # Convert the stdout string return to a dict
-        entry_metric = _extract_values_from_message(metric_str)
+        entry_metric = _extract_values_from_message(output)
+
         if not entry_metric:
             logger.warn(
-                f"No metrics collected for {t}:{r}.\n"
-                f"Command sent was:\n{cmd}\n"
-                f"Remote response was:\n{metric_str}"
+                f"No metrics collected for {t}:{r}.\n" f"Received text:\n{stdout}"
             )
 
         # Update prometheus gauges with chp metric values.
         for k, v in entry_metric.items():
             k = k.strip().lower().replace(" ", "_")
 
-            if k in ignoremetrics:
-                continue
-
             if k == "fairshare":
                 FAIRSHARE_GAUGE.set(v)
             elif k in {"pending", "running"}:
-                RUN_STATUS_GAUGE.labels(
-                    type=str(t),
-                    revision=str(r),
-                    state=k,
-                ).set(v)
+                RUN_STATUS_GAUGE.labels(type=t, revision=r, state=k).set(v)
             else:
-                TAG_STATUS_GAUGE.labels(
-                    type=str(t),
-                    revision=str(r),
-                    state=k,
-                ).set(v)
+                TAG_STATUS_GAUGE.labels(type=t, revision=r, state=k).set(v)

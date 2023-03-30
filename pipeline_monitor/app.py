@@ -12,7 +12,7 @@ from prometheus_client import make_wsgi_app
 from apscheduler.schedulers.background import BackgroundScheduler
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
-from pipeline_monitor import status
+from pipeline_monitor import tasks
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -39,21 +39,15 @@ def set_global_config() -> dict:
         config_file = yaml.safe_load(stream)
 
     _config.update(config_file["app"])
-    _config.update(config_file["ssh"])
-    _config.update(config_file["local"])
-    _config.update(config_file["call"])
-    # _config["ssh"] = config_file["ssh"]
-    # _config["local"] = config_file["local"]
-    # _config["call"] = config_file["call"]
+    _config.update(config_file["exec"])
 
 
 def schedule_monitor() -> None:
     global scheduler
     global _config
-    # Get the list of type : revision to monitor
-    monitor_list = status.setup(_config)
-    if not monitor_list:
-        logging.info("Didn't find anything to monitor.")
+
+    if not _config["scripts"]:
+        logging.info("Didn't find any scripts to run.")
         return
     # Start background task to periodically fetch metrics.
     # Task will run for the first time immediately.
@@ -61,7 +55,7 @@ def schedule_monitor() -> None:
     # run with threads enabled.
     scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
     scheduler.add_job(
-        partial(status.get_status, config=_config, to_monitor=monitor_list),
+        partial(tasks.run_scripts, config=_config),
         "interval",
         minutes=_config["frequency"],
         next_run_time=datetime.now(),
