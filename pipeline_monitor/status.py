@@ -52,6 +52,9 @@ def _extract_values_from_message(text: str) -> dict:
 def _extract_types_and_revs(text: str) -> list[tuple]:
     blocks = []
 
+    # Strip off any header text
+    text = text[text.find(["->"]) :]
+
     for x in text.split("->"):
         if not x:
             continue
