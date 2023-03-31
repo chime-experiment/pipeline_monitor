@@ -53,7 +53,7 @@ def _extract_types_and_revs(text: str) -> list[tuple]:
     blocks = []
 
     # Strip off any header text
-    text = text[text.find(["->"]) :]
+    text = text[text.find("->") :]
 
     for x in text.split("->"):
         if not x:
