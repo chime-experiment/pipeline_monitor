@@ -58,7 +58,12 @@ def _extract_types_and_revs(text: str) -> list[tuple]:
 
         x = x.strip().split("\n", 1)
 
-        blocks.append((*x[0].split(":"), x[-1]))
+        msg = (*x[0].split(":"), x[-1])
+
+        if len(msg) != 3:
+            msg = (None, None, None)
+
+        blocks.append(msg)
 
     return blocks
 
@@ -84,6 +89,8 @@ def update(stdout: str, stderr: str) -> None:
 
     # Split between revisions and types
     for t, r, output in _extract_types_and_revs(stdout):
+        if None in (t, r, output):
+            logger.info(f"Bad response: Got type {t}, rev {r}, output {output}.")
         # Convert the stdout string return to a dict
         entry_metric = _extract_values_from_message(output)
 
