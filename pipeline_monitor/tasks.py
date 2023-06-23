@@ -37,10 +37,11 @@ def run_scripts(config: dict) -> None:
         stdout, stderr = client.exec_script(script[0], script[1:])
 
         # Check to see if the script output resulted in a permission error
-        if permission_error.search(stdout.lower()):
-            raise PermissionError(
+        if permission_error.search(stderr.lower()):
+            logger.warning(
                 f"Unable to execute script {script[0]} due to permission error."
             )
+            continue
 
         if script[0] in OUTPUT_HANDLER:
             logger.info(f"Handling output for script {script[0]}.")
