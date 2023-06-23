@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 
 from pipeline_monitor import status
@@ -8,17 +9,19 @@ logger = logging.getLogger(__name__)
 
 
 # Functions to handle output from specific scripts
-_output_handler = {"bin/update_daily_status": status.update}
+OUTPUT_HANDLER = {"bin/update_daily_status": status.update}
 
 
 def run_scripts(config: dict) -> None:
-    global _output_handler
+    global OUTPUT_HANDLER
 
     scripts_list = config.get("scripts", [])
 
     if not scripts_list:
         logger.info("No scripts to run.")
         return
+
+    permission_error = re.compile(r"\bpermission denied\b")
 
     client = ScriptClient(
         config["exec"],
@@ -33,8 +36,14 @@ def run_scripts(config: dict) -> None:
 
         stdout, stderr = client.exec_script(script[0], script[1:])
 
-        if script[0] in _output_handler:
+        # Check to see if the script output resulted in a permission error
+        if permission_error.search(stdout.lower()):
+            raise PermissionError(
+                f"Unable to execute script {script[0]} due to permission error."
+            )
+
+        if script[0] in OUTPUT_HANDLER:
             logger.info(f"Handling output for script {script[0]}.")
-            _output_handler[script[0]](stdout, stderr)
+            OUTPUT_HANDLER[script[0]](stdout, stderr)
 
     logger.info("Finished running all scripts.")
