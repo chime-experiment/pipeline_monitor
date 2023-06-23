@@ -94,6 +94,7 @@ def update(stdout: str, stderr: str) -> None:
     for t, r, output in _extract_types_and_revs(stdout):
         if None in (t, r, output):
             logger.info(f"Bad response: Got type {t}, rev {r}, output {output}.")
+            continue
         # Convert the stdout string return to a dict
         entry_metric = _extract_values_from_message(output)
 
