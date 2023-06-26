@@ -21,7 +21,9 @@ def run_scripts(config: dict) -> None:
         logger.info("No scripts to run.")
         return
 
+    # Some common errors
     permission_error = re.compile(r"\bpermission denied\b")
+    connection_error = re.compile(r"\bconnection closed by remote host\b")
 
     client = ScriptClient(
         config["exec"],
@@ -40,6 +42,12 @@ def run_scripts(config: dict) -> None:
         if permission_error.search(stderr.lower()):
             logger.warning(
                 f"Unable to execute script {script[0]} due to permission error."
+            )
+            continue
+
+        if connection_error.search(stderr.lower()):
+            logger.warning(
+                f"Unable to execute script {script[0]} due to connection error."
             )
             continue
 
