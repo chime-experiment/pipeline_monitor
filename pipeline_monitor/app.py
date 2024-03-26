@@ -12,7 +12,7 @@ from prometheus_client import make_wsgi_app
 from apscheduler.schedulers.background import BackgroundScheduler
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
-from pipeline_monitor import tasks
+from pipeline_monitor import fetch
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -39,23 +39,20 @@ def set_global_config() -> dict:
         config_file = yaml.safe_load(stream)
 
     _config.update(config_file["app"])
-    _config.update(config_file["exec"])
+    _config.update(config_file["fetch"])
 
 
 def schedule_monitor() -> None:
     global scheduler
     global _config
 
-    if not _config["scripts"]:
-        logging.info("Didn't find any scripts to run.")
-        return
     # Start background task to periodically fetch metrics.
     # Task will run for the first time immediately.
     # In order for this to work, uwsgi server must be
     # run with threads enabled.
     scheduler = BackgroundScheduler(daemon=True, timezone=str(get_localzone()))
     scheduler.add_job(
-        partial(tasks.run_scripts, config=_config),
+        partial(fetch.fetch_metrics, config=_config),
         "interval",
         minutes=_config["frequency"],
         next_run_time=datetime.now(),
