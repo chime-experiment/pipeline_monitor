@@ -16,7 +16,7 @@ def fetch_metrics(config: dict) -> None:
     rhost = config.get("remote_host")
 
     if any(x is None for x in [rid, rusr, rhost]):
-        logger.info(f"Invalid configuration")
+        logger.info("Invalid configuration")
         logger.debug(config)
         return
 
@@ -34,11 +34,11 @@ def fetch_metrics(config: dict) -> None:
 
     # Check to see if the script output resulted in a permission error
     if permission_error.search(stderr.lower()):
-        logger.warning(f"Unable to fetch metrics due to permission error.")
+        logger.warning("Unable to fetch metrics due to permission error.")
         return
 
     if connection_error.search(stderr.lower()):
-        logger.warning(f"Unable to fetch metrics due to connection error.")
+        logger.warning("Unable to fetch metrics due to connection error.")
         return
 
     logger.debug("Handling output.")
