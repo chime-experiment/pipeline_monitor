@@ -43,10 +43,12 @@ def _extract_values_from_message(text: str) -> dict:
     # Get regex match for key: value pairs
     pattern = re.compile(r"(\w+):\s*[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)")
     match = pattern.findall(text)
-    # Cast values to either floats or ints
-    f = lambda x: float(x) if re.findall(r"[.eE]", x) else int(x)
 
-    return {i[0]: f(i[1]) for i in match}
+    # Cast values to either floats or ints
+    def _cast(x):
+        return float(x) if re.findall(r"[.eE]", x) else int(x)
+
+    return {i[0]: _cast(i[1]) for i in match}
 
 
 def _extract_types_and_revs(text: str) -> list[tuple]:
